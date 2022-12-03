@@ -1,7 +1,9 @@
 import MeetupList from '../components/meetups/MeetupList';
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment } from 'react';
+import { MongoClient } from 'mongodb';
+import Head from 'next/head';
 
-export const DUMMY_MEETUPS = [
+/*export const DUMMY_MEETUPS = [
   {
     id: 'm1',
     title: 'First Meetup',
@@ -26,7 +28,7 @@ export const DUMMY_MEETUPS = [
     address: 'Bonn, Lange Starsse 73, 44850',
     description: 'This is a third meetup!',
   },
-];
+];*/
 
 function HomePage(props) {
   //const [loadedMeetups, setLoadedMeetups] = useState([]);
@@ -40,8 +42,16 @@ function HomePage(props) {
     setLoadedMeetups(DUMMY_MEETUPS);
   }, []);*/
 
+  //<Head/> sa da vyuzit na nastavenie metadat, nepr. pre google vyhladavac
   return (
     <Fragment>
+      <Head>
+        <title>NextJs Meetups Page</title>
+        <meta
+          name='description'
+          content='Browse a huge list of highly atractive meetups'
+        />
+      </Head>
       <MeetupList meetups={props.meetups}></MeetupList>
     </Fragment>
   );
@@ -72,9 +82,35 @@ export async function getStaticProps() {
   //vrati props, ktore pouzije ako argument HomePage(props)!!
   //tym padom nepotreebujem useEffect(), ani UseState()...vsetko sa nacita tu vrati cez props!!!
   //cize tu treba urobit http-data-request...a potom data videme aj v statickej html-stranke
+
+  //connect cez MongoDb...TENTO KOD BEZI NA SERVERI, TAKZE VSETKO OK!
+  const mongoUrl =
+    'mongodb://localhost:27027/meetups?retryWrites=true&w=majority';
+  let meetups = [];
+  try {
+    const client = await MongoClient.connect(mongoUrl);
+    const db = client.db();
+    const meetupsColletion = db.collection('meetups');
+    //find() nacita vsetky polozky
+    meetups = await meetupsColletion.find().toArray();
+    //console.log('meetups', meetups);
+    client.close();
+  } catch (error) {
+    console.log(error);
+  }
+
   return {
     props: {
-      meetups: DUMMY_MEETUPS,
+      //meetups: DUMMY_MEETUPS,
+      meetups: meetups.map((meetup) => {
+        return {
+          id: meetup._id.toString(),
+          title: meetup.title,
+          image: meetup.image,
+          address: meetup.address,
+          description: meetup.description,
+        };
+      }),
     },
     //problem je, ze starnka sa vygeneruje iba raz, na zaxiatku...asle ak sa zmeni zoznam, co potom?
     //vraj treba nastavit revalidate: 10...tzn. ze kazdych 10s bude server opat generovat tuto stranku? dobra blbost!!
